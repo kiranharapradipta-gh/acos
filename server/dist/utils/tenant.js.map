@@ -1,0 +1,1 @@
+{"version":3,"file":"tenant.js","sourceRoot":"","sources":["../../src/utils/tenant.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,aAAa,GAAG,CAAC,GAAyB,EAAU,EAAE;IACjE,IAAI,CAAC,GAAG,CAAC,IAAI,EAAE,CAAC;QACd,MAAM,IAAI,KAAK,CAAC,yBAAyB,CAAC,CAAC;IAC7C,CAAC;IAED,OAAO,GAAG,CAAC,IAAI,CAAC,UAAU,CAAC;AAC7B,CAAC,CAAC"}
