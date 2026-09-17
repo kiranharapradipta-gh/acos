@@ -158,9 +158,7 @@ export const createProperty = async (
   const customer = await prisma.customer.findFirst({
     where: {
       id: data.customerId,
-      customer: {
-        businessId,
-      },
+      businessId,
     },
   });
 

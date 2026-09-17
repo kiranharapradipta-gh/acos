@@ -15,16 +15,8 @@ interface Customer {
   name: string;
 }
 
-interface Property {
-  id: string;
-  customerId: string;
-  name: string;
-  address: string;
-}
-
 let token: string;
-let customerId: string;
-let fixturePropertyId: string;
+let fixtureCustomerId: string;
 
 const unique = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -55,70 +47,55 @@ beforeAll(async () => {
 
   expect(loginResponse.status).toBe(200);
 
-  token = unwrapData<{ accessToken: string }>(
+  const loginData = unwrapData<{ accessToken: string }>(
     loginResponse.body,
-  ).accessToken;
+  );
+
+  token = loginData.accessToken;
 
   const customerResponse = await auth(
     request(app)
-      .post("/api/customers")
-      .send({
-        customerCode: unique("PROP"),
-        name: "Property Test Customer",
-      }),
-  );
+      .post("/api/customers"),
+  )
+    .send({
+      customerCode: unique("TEST"),
+      name: "Customer API Fixture",
+      phone: "081234567890",
+    });
 
   expect(customerResponse.status).toBe(201);
 
-  customerId = unwrapData<Customer>(
-    customerResponse.body,
-  ).id;
+  const customer = unwrapData<Customer>(customerResponse.body);
 
-  const propertyResponse = await auth(
-    request(app)
-      .post("/api/properties")
-      .send({
-        customerId,
-        name: "Property API Fixture",
-        address: "Jl. Test No. 123",
-        city: "Medan",
-        postalCode: "20111",
-      }),
-  );
-
-  expect(propertyResponse.status).toBe(201);
-
-  fixturePropertyId = unwrapData<Property>(
-    propertyResponse.body,
-  ).id;
+  fixtureCustomerId = customer.id;
 });
 
-describe("Property API", () => {
+describe("Customer API", () => {
   it("returns 401 without authentication", async () => {
     const response = await request(app)
-      .get("/api/properties");
+      .get("/api/customers");
 
     expect(response.status).toBe(401);
   });
 
   it("returns 401 with invalid token", async () => {
     const response = await request(app)
-      .get("/api/properties")
+      .get("/api/customers")
       .set("Authorization", "Bearer invalid-token");
 
     expect(response.status).toBe(401);
   });
 
-  it("lists properties", async () => {
+  it("lists customers", async () => {
     const response = await auth(
-      request(app).get("/api/properties"),
+      request(app).get("/api/customers"),
     );
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
 
     const data = unwrapData<{
-      data: Property[];
+      data: Customer[];
       pagination: {
         page: number;
         limit: number;
@@ -132,91 +109,92 @@ describe("Property API", () => {
     expect(data.pagination).toHaveProperty("totalPages");
   });
 
-  it("filters properties by customer", async () => {
+  it("supports pagination", async () => {
     const response = await auth(
       request(app)
-        .get("/api/properties")
+        .get("/api/customers")
         .query({
-          customerId,
+          page: 1,
+          limit: 1,
         }),
     );
 
     expect(response.status).toBe(200);
 
     const data = unwrapData<{
-      data: Property[];
+      data: Customer[];
+      pagination: {
+        page: number;
+        limit: number;
+      };
     }>(response.body);
 
-    expect(
-      data.data.every(
-        (property) => property.customerId === customerId,
-      ),
-    ).toBe(true);
+    expect(data.pagination.page).toBe(1);
+    expect(data.pagination.limit).toBe(1);
+    expect(data.data.length).toBeLessThanOrEqual(1);
   });
 
   it("supports search", async () => {
     const response = await auth(
       request(app)
-        .get("/api/properties")
+        .get("/api/customers")
         .query({
-          search: "Property API Fixture",
+          search: "Customer API Fixture",
         }),
     );
 
     expect(response.status).toBe(200);
 
     const data = unwrapData<{
-      data: Property[];
+      data: Customer[];
     }>(response.body);
 
     expect(
       data.data.some(
-        (property) => property.id === fixturePropertyId,
+        (customer) => customer.id === fixtureCustomerId,
       ),
     ).toBe(true);
   });
 
-  it("gets a property by id", async () => {
+  it("gets a customer by id", async () => {
     const response = await auth(
-      request(app).get(
-        `/api/properties/${fixturePropertyId}`,
-      ),
+      request(app).get(`/api/customers/${fixtureCustomerId}`),
     );
 
     expect(response.status).toBe(200);
 
-    const property = unwrapData<Property>(response.body);
+    const customer = unwrapData<Customer>(response.body);
 
-    expect(property.id).toBe(fixturePropertyId);
-    expect(property.customerId).toBe(customerId);
+    expect(customer.id).toBe(fixtureCustomerId);
   });
 
-  it("creates a property", async () => {
+  it("creates a customer", async () => {
+    const customerCode = unique("CREATE");
+
     const response = await auth(
       request(app)
-        .post("/api/properties")
+        .post("/api/customers")
         .send({
-          customerId,
-          name: "Created Property",
-          address: "Jl. Created No. 10",
-          city: "Medan",
+          customerCode,
+          name: "Created Customer",
+          phone: "089999999999",
         }),
     );
 
     expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
 
-    const property = unwrapData<Property>(response.body);
+    const customer = unwrapData<Customer>(response.body);
 
-    expect(property.name).toBe("Created Property");
-    expect(property.customerId).toBe(customerId);
+    expect(customer.customerCode).toBe(customerCode);
+    expect(customer.name).toBe("Created Customer");
   });
 
-  it("validates property creation", async () => {
+  it("validates customer creation", async () => {
     const response = await auth(
       request(app)
-        .post("/api/properties")
+        .post("/api/customers")
         .send({
-          customerId,
           name: "",
         }),
     );
@@ -224,12 +202,12 @@ describe("Property API", () => {
     expect(response.status).toBe(400);
   });
 
-  it("updates a property", async () => {
-    const newName = `Updated Property ${Date.now()}`;
+  it("updates a customer", async () => {
+    const newName = `Updated ${Date.now()}`;
 
     const response = await auth(
       request(app)
-        .patch(`/api/properties/${fixturePropertyId}`)
+        .patch(`/api/customers/${fixtureCustomerId}`)
         .send({
           name: newName,
         }),
@@ -237,50 +215,43 @@ describe("Property API", () => {
 
     expect(response.status).toBe(200);
 
-    const property = unwrapData<Property>(response.body);
+    const customer = unwrapData<Customer>(response.body);
 
-    expect(property.name).toBe(newName);
+    expect(customer.name).toBe(newName);
   });
 
-  it("returns 404 for unknown property", async () => {
+  it("returns 404 for unknown customer", async () => {
     const response = await auth(
       request(app).get(
-        "/api/properties/00000000-0000-0000-0000-000000000000",
+        "/api/customers/00000000-0000-0000-0000-000000000000",
       ),
     );
 
     expect(response.status).toBe(404);
   });
 
-  it("deletes a property", async () => {
+  it("deletes a customer", async () => {
     const createResponse = await auth(
       request(app)
-        .post("/api/properties")
+        .post("/api/customers")
         .send({
-          customerId,
-          name: "Delete Property",
-          address: "Jl. Delete No. 1",
+          customerCode: unique("DELETE"),
+          name: "Delete Customer",
         }),
     );
 
     expect(createResponse.status).toBe(201);
 
-    const property = unwrapData<Property>(
-      createResponse.body,
-    );
+    const customer = unwrapData<Customer>(createResponse.body);
 
     const deleteResponse = await auth(
-      request(app).delete(
-        `/api/properties/${property.id}`,
-      ),
+      request(app).delete(`/api/customers/${customer.id}`),
     );
 
     expect(deleteResponse.status).toBe(200);
 
     const getResponse = await auth(
-      request(app).get(
-        `/api/properties/${property.id}`,
-      ),
+      request(app).get(`/api/customers/${customer.id}`),
     );
 
     expect(getResponse.status).toBe(404);

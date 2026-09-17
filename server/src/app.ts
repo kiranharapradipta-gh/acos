@@ -4,22 +4,21 @@ import helmet from "helmet";
 import morgan from "morgan";
 
 import { env } from "./config/env.js";
-import { prisma } from "./config/database.js";
-
-import { errorMiddleware } from "./middleware/error.middleware.js";
-
 import authRoutes from "./modules/auth/auth.routes.js";
 import customerRoutes from "./modules/customers/customer.routes.js";
 import propertyRoutes from "./modules/properties/property.routes.js";
+import { errorMiddleware } from "./middleware/error.middleware.js";
 
 const app = express();
 
 app.use(helmet());
+
 app.use(
   cors({
     origin: env.CORS_ORIGIN,
   }),
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
@@ -31,44 +30,10 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.get("/health/db", async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-
-    res.json({
-      success: true,
-      message: "Database connection is healthy",
-    });
-  } catch (error) {
-    console.error("Database health check failed:", error);
-
-    res.status(503).json({
-      success: false,
-      message: "Database connection failed",
-    });
-  }
-});
-
 app.use("/api/auth", authRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/properties", propertyRoutes);
 
-
 app.use(errorMiddleware);
 
-const server = app.listen(env.PORT, () => {
-  console.log(`AC Service Management API running on http://localhost:${env.PORT}`);
-});
-
-const shutdown = async (signal: string) => {
-  console.log(`${signal} received. Shutting down...`);
-
-  server.close(async () => {
-    await prisma.$disconnect();
-    console.log("Server stopped.");
-    process.exit(0);
-  });
-};
-
-process.on("SIGINT", () => void shutdown("SIGINT"));
-process.on("SIGTERM", () => void shutdown("SIGTERM"));
+export default app;
